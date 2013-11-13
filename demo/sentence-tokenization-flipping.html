@@ -87,6 +87,7 @@ rect {
   g.addEdge(null, 1, 13);
   g.addEdge(null, 0, 1);
 
+  var svg = d3.select("svg g");
   var nextDir = {TB: 'BT', BT: 'LR', LR: 'RL', RL: 'TB'};
   var layout = dagreD3.layout().rankDir('TB');
   var renderer = new dagreD3.Renderer()
@@ -98,8 +99,6 @@ rect {
     oldDrawNode(graph, u, svg);
     svg.classed(graph.node(u).nodeclass, true);
   });
-  var svg = d3.select("svg g");
-
   renderer.run(svg);
 
   d3.select('#flip').on('click', flip)
@@ -126,6 +125,8 @@ rect {
   }
 
   function changeLayoutDirection (dir) {
+      d3.selectAll('button').property("disabled", false);
+      d3.selectAll('#' + dir.toLowerCase()).property("disabled", true);
       renderer.layout(layout.rankDir(dir))
               .transition(entryTransition)
               .update();
