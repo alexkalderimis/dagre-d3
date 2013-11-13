@@ -42,24 +42,33 @@ rect {
     <g transform="translate(20, 20)"/>
   </svg>
 </div>
+<section id="controls">
+    <button id="flip">Flip</button>
+    <button id="tb">Default (Vertical) Layout</button>
+    <button id="bt">Inverted Vertical</button>
+    <button id="lr">Horizontal Layout</button>
+    <button id="rl">Inverted Horizontal</button>
+</section>
 
 <script>
   var g = new dagreD3.Digraph();
-  g.addNode(0,  { label: "TOP",       nodeclass: "type-TOP" });
-  g.addNode(1,  { label: "S",         nodeclass: "type-S" });
-  g.addNode(2,  { label: "NP",        nodeclass: "type-NP" });
-  g.addNode(3,  { label: "DT",        nodeclass: "type-DT" });
-  g.addNode(4,  { label: "This",      nodeclass: "type-TK" });
-  g.addNode(5,  { label: "VP",        nodeclass: "type-VP" });
-  g.addNode(6,  { label: "VBZ",       nodeclass: "type-VBZ" });
-  g.addNode(7,  { label: "is",        nodeclass: "type-TK" });
-  g.addNode(8,  { label: "NP",        nodeclass: "type-NP" });
-  g.addNode(9,  { label: "DT",        nodeclass: "type-DT" });
-  g.addNode(10, { label: "an",        nodeclass: "type-TK" });
-  g.addNode(11, { label: "NN",        nodeclass: "type-NN" });
-  g.addNode(12, { label: "example",   nodeclass: "type-TK" });
-  g.addNode(13, { label: ".",         nodeclass: "type-." });
-  g.addNode(14, { label: "sentence",  nodeclass: "type-TK" });
+  g.addNode(0,  { label: "TOP",                   nodeclass: "type-TOP" });
+  g.addNode(1,  { label: "S",                     nodeclass: "type-S" });
+  g.addNode(2,  { label: "NP",                    nodeclass: "type-NP" });
+  g.addNode(3,  { label: "DT",                    nodeclass: "type-DT" });
+  g.addNode(4,  { label: "This",     rank: 'max', nodeclass: "type-TK" });
+  g.addNode(5,  { label: "VP",                    nodeclass: "type-VP" });
+  g.addNode(6,  { label: "VBZ",                   nodeclass: "type-VBZ" });
+  g.addNode(7,  { label: "is",       rank: 'max', nodeclass: "type-TK" });
+  g.addNode(8,  { label: "NP",                    nodeclass: "type-NP" });
+  g.addNode(9,  { label: "DT",                    nodeclass: "type-DT" });
+  g.addNode(10, { label: "an",       rank: 'max', nodeclass: "type-TK" });
+  g.addNode(11, { label: "NN",                    nodeclass: "type-NN" });
+  g.addNode(12, { label: "example",  rank: 'max', nodeclass: "type-TK" });
+  g.addNode(13, { label: ".",        rank: 'max', nodeclass: "type-." });
+  g.addNode(14, { label: "sentence", rank: 'max', nodeclass: "type-TK" });
+  g.addNode(15, { label: "AA",                    nodeclass: "type-AA"});
+  g.addNode(16, { label: "AP",                    nodeclass: "type-AP"});
 
   g.addEdge(null, 3, 4);
   g.addEdge(null, 2, 3);
@@ -68,17 +77,22 @@ rect {
   g.addEdge(null, 5, 6);
   g.addEdge(null, 9, 10);
   g.addEdge(null, 8, 9);
-  g.addEdge(null, 11,12);
+  g.addEdge(null, 8, 16);
   g.addEdge(null, 8, 11);
   g.addEdge(null, 5, 8);
   g.addEdge(null, 1, 5);
-  g.addEdge(null, 13,14);
+  g.addEdge(null, 15, 12);
+  g.addEdge(null, 16, 15);
+  g.addEdge(null, 11, 14);
   g.addEdge(null, 1, 13);
-  g.addEdge(null, 0, 1)
+  g.addEdge(null, 0, 1);
 
   var nextDir = {TB: 'BT', BT: 'LR', LR: 'RL', RL: 'TB'};
   var layout = dagreD3.layout().rankDir('TB');
-  var renderer = new dagreD3.Renderer().graph(g).layout(layout).arrowToRoot(true);
+  var renderer = new dagreD3.Renderer()
+                            .graph(g)
+                            .layout(layout)
+                            .arrowToRoot(true);
   var oldDrawNode = renderer.drawNode();
   renderer.drawNode(function(graph, u, svg) {
     oldDrawNode(graph, u, svg);
@@ -88,7 +102,11 @@ rect {
 
   renderer.run(svg);
 
-  svg.on('click', flip)
+  d3.select('#flip').on('click', flip)
+  d3.select('#tb').on('click', changeLayoutDirection.bind(null, 'TB'));
+  d3.select('#bt').on('click', changeLayoutDirection.bind(null, 'BT'));
+  d3.select('#rl').on('click', changeLayoutDirection.bind(null, 'RL'));
+  d3.select('#lr').on('click', changeLayoutDirection.bind(null, 'LR'));
 
   // Add zoom behavior
   d3.select("svg")
@@ -104,8 +122,10 @@ rect {
   }
 
   function flip () {
-      console.log("Flipping");
-      var dir = nextDir[renderer.layout().rankDir()];
+      return changeLayoutDirection(nextDir[renderer.layout().rankDir()]);
+  }
+
+  function changeLayoutDirection (dir) {
       renderer.layout(layout.rankDir(dir))
               .transition(entryTransition)
               .update();
