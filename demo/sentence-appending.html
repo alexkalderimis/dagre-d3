@@ -1,0 +1,204 @@
+<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+<script type="text/javascript" src="../build/dagre-d3.js"></script>
+
+<style>
+.type-TK > .label > rect {
+  fill: #ff0066;
+}
+.highlight > .label > rect {
+  fill: #0099ff;
+}
+
+svg {
+  border: 1px solid #999;
+}
+
+text {
+  font-weight: 300;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serf;
+  font-size: 14px;
+}
+
+rect {
+  fill: #fff;
+}
+
+.node rect {
+  stroke-width: 1px;
+  stroke: #999;
+  fill: none;
+}
+
+.edge rect {
+  fill: #fff;
+}
+
+.edge path {
+  fill: none;
+  stroke: #333;
+  stroke-width: 1.5px;
+}
+</style>
+
+<div id="attach">
+  <svg id="svg-canvas" width=800 height=600>
+    <g transform="translate(20, 20)"/>
+  </svg>
+</div>
+<section id="controls">
+    <input type="text" id="node-label" placeholder="node-label">
+    <label>Is leaf? <input type="checkbox" id="is-leaf"></label>
+    <select id="parent-node"></select>
+    <button id="add-node">Add</button>
+    <button id="del-node">Remove</button>
+</section>
+
+<script>
+  var g = new dagreD3.Digraph();
+  g.addNode(0,  { label: "TOP",                   nodeclass: "type-TOP" });
+  g.addNode(1,  { label: "S",                     nodeclass: "type-S" });
+  g.addNode(2,  { label: "NP",                    nodeclass: "type-NP" });
+  g.addNode(3,  { label: "DT",                    nodeclass: "type-DT" });
+  g.addNode(4,  { label: "This",     rank: 'max', nodeclass: "type-TK" });
+  g.addNode(5,  { label: "VP",                    nodeclass: "type-VP" });
+  g.addNode(6,  { label: "VBZ",                   nodeclass: "type-VBZ" });
+  g.addNode(7,  { label: "is",       rank: 'max', nodeclass: "type-TK" });
+  g.addNode(8,  { label: "NP",                    nodeclass: "type-NP" });
+  g.addNode(9,  { label: "DT",                    nodeclass: "type-DT" });
+  g.addNode(10, { label: "an",       rank: 'max', nodeclass: "type-TK" });
+  g.addNode(11, { label: "NN",                    nodeclass: "type-NN" });
+  g.addNode(12, { label: "example",  rank: 'max', nodeclass: "type-TK" });
+  g.addNode(13, { label: "sentence", rank: 'max', nodeclass: "type-TK" });
+  g.addNode(14, { label: "AA",                    nodeclass: "type-AA"});
+  g.addNode(15, { label: "AP",                    nodeclass: "type-AP"});
+
+  addEdge(3, 4);
+  addEdge(2, 3);
+  addEdge(1, 2);
+  addEdge(6, 7);
+  addEdge(5, 6);
+  addEdge(9, 10);
+  addEdge(8, 9);
+  addEdge(8, 15);
+  addEdge(8, 11);
+  addEdge(5, 8);
+  addEdge(1, 5);
+  addEdge(14, 12);
+  addEdge(15, 14);
+  addEdge(11, 13);
+  addEdge(0, 1);
+
+  var svg = d3.select("svg g");
+  var layout = dagreD3.layout().rankDir('TB');
+  var renderer = new dagreD3.Renderer()
+                            .graph(g)
+                            .nodeJoinKey(identity)
+                            .edgeJoinKey(identity)
+                            .layout(layout)
+                            .arrowToRoot(true);
+  var oldDrawNode = renderer.drawNode();
+  renderer.drawNode(function(graph, u, svg) {
+    oldDrawNode(graph, u, svg);
+    svg.classed(graph.node(u).nodeclass, true);
+    svg.classed('highlight', !!graph.node(u).highlight);
+    svg.on('click', highlightCurrentParent);
+  });
+  renderer.run(svg);
+
+  var selectParent = d3.select('#parent-node');
+  var possibleParents = selectParent.selectAll('option');
+
+  showPossibleParents();
+
+  highlightCurrentParent(0);
+
+  d3.select('#add-node').on('click', function () {
+      var label = document.getElementById('node-label').value;
+      var isLeaf = document.getElementById('is-leaf').checked;
+      var nodeclass = isLeaf ? "type-TK" : "type-" + label;
+      var select = document.getElementById('parent-node');
+      var pid = select.options[select.selectedIndex].value;
+      var newNodeId = g.nodes().length;
+      var node = { label: label, nodeclass: nodeclass};
+      if (isLeaf) node.rank = 'max';
+      g.addNode(newNodeId, node);
+      addEdge(pid, newNodeId);
+      updateGraph();
+      showPossibleParents();  
+  });
+  d3.select('#del-node').on('click', function () {
+      var select = document.getElementById('parent-node');
+      var nid = select.options[select.selectedIndex].value;
+      var gonners = [nid];
+      var edges = g.incidentEdges(nid);
+      var toProcess = g.successors(nid);
+      while (next = toProcess.pop()) {
+        gonners.push(next);
+        edges = edges.concat(g.incidentEdges(next));
+        toProcess = toProcess.concat(g.successors(next));
+      }
+      edges.forEach(function (eid) {
+          if (g.hasEdge(eid)) g.delEdge(eid);
+      });
+      gonners.forEach(function (nid) {
+          if (g.hasNode(nid)) g.delNode(nid);
+      });
+      updateGraph();
+  });
+
+  selectParent.on('change', function () {
+      var nid = this.options[this.selectedIndex].value;
+      highlightCurrentParent(nid);
+  });
+
+  // Add zoom behavior
+  d3.select("svg")
+    .call(d3.behavior.zoom().on("zoom", zoom));
+
+  function showPossibleParents() {
+    possibleParents = possibleParents.data(g.nodes().filter(function (nid) {
+        return 'max' !== g.node(nid).rank;
+    }));
+    possibleParents.enter()
+        .append('option')
+        .property('value', identity)
+        .text(function (d, i) { return g.node(d).label; });
+  }
+
+  function highlightCurrentParent(nid) {
+    var select = document.getElementById('parent-node');
+    [].slice.call(select.options).forEach(function (opt, idx) {
+        if (opt.value === '' + nid) select.selectedIndex = idx;
+    });
+
+    g.nodes().forEach(function (n) {
+        g.node(n).highlight = false;
+    });
+    g.node(nid).highlight = true;
+    updateGraph();
+  }
+    
+  function zoom () {
+      var ev = d3.event;
+      svg.attr("transform", "translate(" + ev.translate + ") scale(" + ev.scale + ")");
+  }
+
+  function addEdge(parent, child) {
+      g.addEdge(parent + '-' + child, parent, child);
+  }
+
+  function entryTransition (selection) {
+      return selection.transition().duration(250);
+  }
+
+  function identity (x) {
+    return x;
+  }
+
+  function updateGraph () {
+      renderer.graph(g)
+              .layout(layout)
+              .transition(entryTransition)
+              .update();
+  }
+</script>
